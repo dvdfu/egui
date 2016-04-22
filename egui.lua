@@ -126,9 +126,9 @@ function Container:refresh()
     self.temp = {}
 
     for prop, val in pairs(self.props) do
-        if prop == 'fillWidth' and val then
+        if prop == 'fillWidth' and val and self.parent then
             self.props.width = self.parent:getInnerBounds().size.x
-        elseif prop == 'fillHeight' and val then
+        elseif prop == 'fillHeight' and val and self.parent then
             self.props.height = self.parent:getInnerBounds().size.y
         end
     end
@@ -139,7 +139,7 @@ function Container:refresh()
 end
 
 function Container:sendMouseEvent(event)
-    if not self.layout.visible then return end
+    if not self.layout.visible then return false end
 
     event.x = event.x - self.props.x - self.props.marginLeft
     event.y = event.y - self.props.y - self.props.marginTop
@@ -147,16 +147,22 @@ function Container:sendMouseEvent(event)
 
     for _, child in pairs(self.children) do
         if child:getBounds():contains(event.x, event.y) then
-            child:sendMouseEvent(event)
-            sent = true
+            if child:sendMouseEvent(event) then
+                sent = true
+            end
         end
     end
 
     if not sent then
         if event.pressed then
-            self.props.onMouseClick(self, event)
+            if self.props.onMouseClick ~= nullFunction then
+                self.props.onMouseClick(self, event)
+                sent = true
+            end
         end
     end
+
+    return sent
 end
 
 function Container:getBounds()
@@ -262,9 +268,9 @@ function ListContainer:refresh()
     self.temp = {}
 
     for prop, val in pairs(self.props) do
-        if prop == 'fillWidth' and val then
+        if prop == 'fillWidth' and val and self.parent then
             self.props.width = self.parent:getInnerBounds().size.x
-        elseif prop == 'fillHeight' and val then
+        elseif prop == 'fillHeight' and val and self.parent then
             self.props.height = self.parent:getInnerBounds().size.y
         end
     end
@@ -293,11 +299,9 @@ function Text:add(child) end
 
 function Text:remove(child) end
 
-function Text:refresh() end
-
 function Text:draw()
     love.graphics.setColor(0, 0, 0)
-    love.graphics.print(self.text, 0, 0, 'center', self.props.width)
+    love.graphics.printf(self.text, 0, 0, self.props.width, 'left')
     love.graphics.setColor(255, 255, 255)
 end
 
