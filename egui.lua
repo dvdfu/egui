@@ -23,17 +23,17 @@ function Rectangle:init(x, y, w, h)
 end
 
 function Rectangle:intersects(other)
-    return self.pos.x < other.pos.x + other.size.x and
-        self.pos.x + self.size.x > other.pos.x and
-        self.pos.y < other.pos.y + other.size.y and
-        self.pos.y + self.size.y > other.pos.y
+    return self.pos.x <= other.pos.x + other.size.x and
+        self.pos.x + self.size.x >= other.pos.x and
+        self.pos.y <= other.pos.y + other.size.y and
+        self.pos.y + self.size.y >= other.pos.y
 end
 
 function Rectangle:intersectsChild(child)
-    return child.pos.x + child.size.x > 0 and
-        child.pos.x < self.size.x and
-        child.pos.y + child.size.y > 0 and
-        child.pos.y < self.size.y
+    return child.pos.x + child.size.x >= 0 and
+        child.pos.x <= self.size.x and
+        child.pos.y + child.size.y >= 0 and
+        child.pos.y <= self.size.y
 end
 
 function Rectangle:contains(x, y)
@@ -64,28 +64,38 @@ local Container = Class {
         marginRight = 0,
         separation = 0,
         -- background and border
-        backgroundVisible = true,
+        backgroundVisible = false,
         backgroundColor = '#ffffff',
-        borderVisible = true,
+        borderVisible = false,
         borderColor = '#888888',
         -- mouse events
         onMouseEnter = nullFunction,
         onMouseHover = nullFunction,
         onMouseClick = nullFunction,
         onMouseLeave = nullFunction
+    },
+    defaultLayout = {
+        offsetX = 0,
+        offsetY = 0,
+        alpha = 1,
+        visible = true
     }
 }
 
 function Container:init(props, children)
-    self.parent = nil
-    self.children = {}
     self.props = {}
     self.temp = {}
     self.layout = {}
-    
+    self.parent = nil
+    self.children = {}
+
     props = props or {}
     for prop, val in pairs(Container.defaultProps) do
         self.props[prop] = props[prop] or val
+    end
+
+    for item, val in pairs(Container.defaultLayout) do
+        self.layout[item] = val
     end
 
     children = children or {}
@@ -108,6 +118,10 @@ function Container:remove(child)
     end
 end
 
+function Container:removeIndex(index)
+    self:remove(self.children[index])
+end
+
 function Container:refresh()
     self.temp = {}
 
@@ -125,6 +139,8 @@ function Container:refresh()
 end
 
 function Container:sendMouseEvent(event)
+    if not self.layout.visible then return end
+
     event.x = event.x - self.props.x - self.props.marginLeft
     event.y = event.y - self.props.y - self.props.marginTop
     local sent = false
@@ -171,9 +187,14 @@ function Container:getTruePosition()
 end
 
 function Container:draw()
+    if not self.layout.visible then return end
+
+    love.graphics.push()
+    love.graphics.translate(self.layout.offsetX, self.layout.offsetY)
+
     if self.props.backgroundVisible then
         love.graphics.setColor(hexToRGB(self.props.backgroundColor))
-        self:getBounds():draw('fill')
+        self:getBounds():draw('fill', self.layout.offsetX, self.layout.offsetY)
         love.graphics.setColor(255, 255, 255)
     end
 
@@ -207,9 +228,11 @@ function Container:draw()
 
     if self.props.borderVisible then
         love.graphics.setColor(hexToRGB(self.props.borderColor))
-        self:getBounds():draw('line')
+        self:getBounds():draw('line', self.layout.offsetX, self.layout.offsetY)
         love.graphics.setColor(255, 255, 255)
     end
+
+    love.graphics.pop()
 end
 
 --============================================================================== LIST CONTAINER
@@ -235,10 +258,6 @@ function ListContainer:remove(child)
     self:refresh()
 end
 
-function ListContainer:removeIndex(index)
-    self:remove(self.children[index])
-end
-
 function ListContainer:refresh()
     self.temp = {}
 
@@ -258,7 +277,32 @@ function ListContainer:refresh()
     end
 end
 
+--============================================================================== TEXT
+
+local Text = Class { __includes = Container }
+
+function Text:init(text)
+    Container.init(self, {
+        fillWidth = true,
+        fillHeight = true
+    })
+    self.text = text
+end
+
+function Text:add(child) end
+
+function Text:remove(child) end
+
+function Text:refresh() end
+
+function Text:draw()
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.print(self.text, 0, 0, 'center', self.props.width)
+    love.graphics.setColor(255, 255, 255)
+end
+
 return {
     Container = Container,
-    ListContainer = ListContainer
+    ListContainer = ListContainer,
+    Text = Text
 }
