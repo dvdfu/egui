@@ -79,6 +79,7 @@ local Container = Class {
         -- callbacks
         onDraw = nullFunction,
         onMouseClick = nullFunction,
+        onMouseRelease = nullFunction,
         onMouseWheel = nullFunction,
         onMouseEnter = nullFunction,
         onMouseLeave = nullFunction,
@@ -100,7 +101,8 @@ local Container = Class {
         visible = true,
         scrollSpeed = 0
     },
-    mouseTarget = nil
+    mouseTarget = nil,
+    clickTarget = nil
 }
 
 function Container:init(props, children)
@@ -200,10 +202,17 @@ function Container:sendMouseEvent(event)
     if sent then return true end
 
     if event.type == 'press' then
+        Container.clickTarget = self
         if self.props.onMouseClick ~= nullFunction then
             self.props.onMouseClick(self, event)
-            return true
         end
+        return true
+    elseif event.type == 'release' then
+        if Container.clickTarget == self and self.props.onMouseRelease ~= nullFunction then
+            self.props.onMouseRelease(self, event)
+            Container.clickTarget = nil
+        end
+        return true
     elseif event.type == 'wheel' then
         if self.props.onMouseWheel ~= nullFunction then
             self.props.onMouseWheel(self, event)
