@@ -1,43 +1,53 @@
 # EGUI
 
-EGUI is a GUI library written for the LÖVE2D framework. Its goal is to provide tools to build simple and lightweight GUI components. It targets mobile-like interaction but supports regular mouse input.
+EGUI is a GUI library written for the LÖVE2D framework. Its goal is to provide performant tools to build simple and lightweight GUI components. It targets mobile-like interaction but supports regular mouse input.
 
 [hump](https://github.com/vrld/hump) is used for `Class`, `Vector`, and `Timer` modules.
 
-## Example Use
+# Usage
+
+## Container
+
+A new `Container` is created by calling `EGUI.Container()`. A table of properties and children can be passed to the constructor. See **Properties** for a list of all container properties.
 
 ```lua
 EGUI = require('EGUI')
+container = EGUI.Container(properties, children)
 ```
 
-A new EGUI container can be created by calling `EGUI.Container()`. A table of properties and children can also be passed to the constructor. See **Properties** for a list of container properties.
+* it is useful to store the properties table in a variable for reuse
+* the children table is useful for creating nested container structures
 
-```lua
-container = EGUI.Container(props, children)
-```
+## ListContainer
 
-It may be useful to store property tables in a variable for reuse. The children table can be useful for creating nested container structures.
+A new `ListContainer` is created by calling `EGUI.ListContainer()`. These containers arrange children in a single column so that none overlap. When a child is removed, the gap is closed.
+
+* the `separation` property defines vertical spacing between children
+* if `expands` is set, the height of the container matches the height of its children combined
 
 ```lua
 listProperties = {
-    width = 160,
-    height = 320,
-    marginLeft = 16
+    width = 100,
+    expands = true
 }
 
 itemProperties = {
-    height = 32,
+    height = 20,
     fillWidth = true
 }
 
-list = EGUI.Container(listProperties, {
+list = EGUI.ListContainer(listProperties, {
         EGUI.Container(itemProperties),
         EGUI.Container(itemProperties),
         EGUI.Container(itemProperties)
     })
 ```
 
-## Properties
+## RowContainer
+
+A `RowContainer` is identical to a `ListContainer`, except it aligns its children horizontally.
+
+# Properties
 
 ```lua
 x
@@ -46,6 +56,8 @@ width
 height
 fillWidth -- fills parent container dimension
 fillHeight
+alignH -- alignment within parent container
+alignV
 
 marginTop
 marginBottom

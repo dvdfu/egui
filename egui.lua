@@ -4,7 +4,7 @@ local Timer = require('hump/timer')
 
 --============================================================================== HELPERS
 
-function hexToRGB(hex)
+local function hexToRGB(hex)
     hex = hex:gsub('#', '')
     return
         tonumber('0x'..hex:sub(1, 2)),
@@ -12,7 +12,7 @@ function hexToRGB(hex)
         tonumber('0x'..hex:sub(5, 6))
 end
 
-function nullFunction() end
+local function nullFunction() end
 
 --============================================================================== RECTANGLE
 
@@ -28,13 +28,6 @@ function Rectangle:intersects(other)
         self.pos.x + self.size.x >= other.pos.x and
         self.pos.y <= other.pos.y + other.size.y and
         self.pos.y + self.size.y >= other.pos.y
-end
-
-function Rectangle:intersectsChild(child)
-    return child.pos.x + child.size.x >= 0 and
-        child.pos.x <= self.size.x and
-        child.pos.y + child.size.y >= 0 and
-        child.pos.y <= self.size.y
 end
 
 function Rectangle:getIntersection(other)
@@ -71,6 +64,8 @@ local Container = Class {
         height = 0,
         fillWidth = false,
         fillHeight = false,
+        alignH = 'none', --TODO
+        alignV = 'none',
         -- margin and spacing
         marginTop = 0,
         marginBottom = 0,
@@ -100,14 +95,15 @@ local Container = Class {
 }
 
 function Container:init(props, children)
+    props = props or {}
+    children = children or {}
+
+    self.parent = nil
+    self.children = {}
     self.props = {}
     self.temp = {}
     self.layout = {}
-    self.event = {}
-    self.parent = nil
-    self.children = {}
 
-    props = props or {}
     for prop, val in pairs(Container.defaultProps) do
         self.props[prop] = props[prop] or val
     end
@@ -116,7 +112,6 @@ function Container:init(props, children)
         self.layout[item] = val
     end
 
-    children = children or {}
     for _, child in pairs(children) do
         self:add(child)
     end
@@ -127,7 +122,7 @@ function Container:add(child)
     child.parent = self
     child:refresh()
 
-    self:refresh()
+    self:refresh() -- TODO reduce uses of refresh
 end
 
 function Container:remove(child)
@@ -160,20 +155,24 @@ end
 function Container:refresh()
     self.temp = {}
     self:refreshProps()
-
-    for _, child in pairs(self.children) do
-        child:refresh()
-    end
+    self:refreshChildren()
 end
 
 -- properties that need to be updated when a container is refreshed
 function Container:refreshProps()
+    -- TODO reduce number of properties that need to be redone
     for prop, val in pairs(self.props) do
         if prop == 'fillWidth' and val and self.parent then
             self.props.width = self.parent:getInnerBounds().size.x
         elseif prop == 'fillHeight' and val and self.parent then
             self.props.height = self.parent:getInnerBounds().size.y
         end
+    end
+end
+
+function Container:refreshChildren()
+    for _, child in pairs(self.children) do
+        child:refresh()
     end
 end
 
@@ -257,45 +256,43 @@ end
 function Container:draw(region)
     if not self.layout.visible then return end
 
-    if not region then
-        region = self:getTrueBounds()
-    end
+    region = region or self:getTrueBounds()
 
     love.graphics.push()
-        love.graphics.translate(self.layout.offsetX, self.layout.offsetY)
+    love.graphics.translate(self.layout.offsetX, self.layout.offsetY)
 
-        -- draw background
-        if self.props.backgroundVisible then
-            love.graphics.setColor(hexToRGB(self.props.backgroundColor))
-            self:getBounds():draw('fill', self.layout.offsetX, self.layout.offsetY)
-            love.graphics.setColor(255, 255, 255)
+    -- draw background
+    if self.props.backgroundVisible then
+        love.graphics.setColor(hexToRGB(self.props.backgroundColor))
+        self:getBounds():draw('fill', self.layout.offsetX, self.layout.offsetY)
+        love.graphics.setColor(255, 255, 255)
+    end
+
+    -- draw children
+    if next(self.children) then
+        love.graphics.push()
+        love.graphics.translate(self.props.x + self.props.marginLeft, self.props.y + self.props.marginTop)
+
+        local intersect = nil
+        for _, child in pairs(self.children) do
+            intersect = region:getIntersection(child:getTrueBounds())
+            if intersect then
+                love.graphics.setScissor(intersect:unpack())
+                child:draw(intersect)
+            end
         end
 
-        -- draw children
-        if next(self.children) then
-            love.graphics.push()
-                love.graphics.translate(
-                    self.props.x + self.props.marginLeft,
-                    self.props.y + self.props.marginTop)
+        love.graphics.setScissor()
+        love.graphics.pop()
+    end
 
-                for _, child in pairs(self.children) do
-                    local intersect = region:getIntersection(child:getTrueBounds())
-                    if intersect then
-                        love.graphics.setScissor(intersect:unpack())
-                        child:draw(intersect)
-                    end
-                end
+    -- draw border
+    if self.props.borderVisible then
+        love.graphics.setColor(hexToRGB(self.props.borderColor))
+        self:getBounds():draw('line', self.layout.offsetX, self.layout.offsetY)
+        love.graphics.setColor(255, 255, 255)
+    end
 
-                love.graphics.setScissor()
-            love.graphics.pop()
-        end
-
-        -- draw border
-        if self.props.borderVisible then
-            love.graphics.setColor(hexToRGB(self.props.borderColor))
-            self:getBounds():draw('line', self.layout.offsetX, self.layout.offsetY)
-            love.graphics.setColor(255, 255, 255)
-        end
     love.graphics.pop()
 end
 
@@ -303,10 +300,7 @@ end
 
 local ListContainer = Class { __includes = Container }
 
-function ListContainer:refresh()
-    self.temp = {}
-    self:refreshProps()
-
+function ListContainer:refreshChildren()
     self.temp.tail = 0
     for _, child in pairs(self.children) do
         child.props.y = self.temp.tail
@@ -323,10 +317,7 @@ end
 
 local RowContainer = Class { __includes = Container }
 
-function RowContainer:refresh()
-    self.temp = {}
-    self:refreshProps()
-
+function RowContainer:refreshChildren()
     self.temp.tail = 0
     for _, child in pairs(self.children) do
         child.props.x = self.temp.tail
@@ -346,7 +337,7 @@ local ScrollContainer = Class { __includes = Container }
 function ScrollContainer:init(props, children)
     props = props or {}
     props.onMouseWheel = function(self, event)
-        self.layout.scrollSpeed = event.wheelY * 12
+        self.layout.scrollSpeed = event.wheelY * 12 -- TODO property
     end
 
     local pane = ListContainer({
@@ -359,7 +350,7 @@ function ScrollContainer:init(props, children)
 end
 
 function ScrollContainer:add(child)
-    if next(self.children) then
+    if self.pane then
         self.pane:add(child)
     else
         Container.add(self, child)
@@ -377,6 +368,7 @@ end
 
 function ScrollContainer:update(dt)
     Container.update(self, dt)
+
     if math.abs(self.layout.scrollSpeed) > 0.1 then
         self.pane.props.y = self.pane.props.y + self.layout.scrollSpeed
 
@@ -429,22 +421,25 @@ end
 local Text = Class {
     __includes = Container,
     defaultProps = {
-        font = love.graphics.newFont(12),
-        textColor = '#000000',
         fillWidth = true,
-        fillHeight = true
-    }
+        fillHeight = true,
+        alignH = 'left',
+        alignV = 'center'
+    },
+    defaultFont = love.graphics.newFont(12),
+    defaultFontColor = '#000000'
 }
 
 function Text:init(text, props)
     props = props or {}
+    for prop, val in pairs(Text.defaultProps) do
+        props[prop] = props[prop] or val
+    end
     Container.init(self, props)
 
-    for prop, val in pairs(Text.defaultProps) do
-        self.props[prop] = self.props[prop] or props[prop] or val
-    end
-
     self.text = text
+    self.font = props.font or Text.defaultFont
+    self.fontColor = props.fontColor or Text.defaultFontColor
 end
 
 function Text:add(child) end
@@ -452,9 +447,16 @@ function Text:add(child) end
 function Text:remove(child) end
 
 function Text:draw()
-    love.graphics.setColor(hexToRGB(self.props.textColor))
-    love.graphics.setFont(self.props.font)
-    love.graphics.printf(self.text, 0, 0, self.props.width, 'left')
+    love.graphics.setColor(hexToRGB(self.fontColor))
+    love.graphics.setFont(self.font)
+
+    local y = 0
+    if self.props.alignV == 'center' then
+        y = (self.props.height - self.font:getHeight()) / 2
+    elseif self.props.alignV == 'bottom' then
+        y = self.props.height - self.font:getHeight()
+    end
+    love.graphics.printf(self.text, 0, y, self.props.width, self.props.alignH)
     love.graphics.setColor(255, 255, 255)
 end
 
