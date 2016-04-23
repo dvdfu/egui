@@ -6,74 +6,48 @@ EGUI is a GUI library written for the LÖVE2D framework. Its goal is to provide 
 
 # Usage
 
-## Container
-
-A new `Container` is created by calling `EGUI.Container()`. A table of properties and children can be passed to the constructor. See **Properties** for a list of all container properties.
+Require the EGUI library:
 
 ```lua
 EGUI = require('EGUI')
-container = EGUI.Container(properties, children)
 ```
 
-* it is useful to store the properties table in a variable for reuse
-* the children table is useful for creating nested container structures
-
-## ListContainer
-
-A new `ListContainer` is created by calling `EGUI.ListContainer()`. These containers arrange children in a single column so that none overlap. When a child is removed, the gap is closed.
-
-* the `separation` property defines vertical spacing between children
-* if `expands` is set, the height of the container matches the height of its children combined
+## Container
 
 ```lua
-listProperties = {
-    width = 100,
-    expands = true
-}
+local container = EGUI.Container(properties, children)
+```
 
-itemProperties = {
-    height = 20,
-    fillWidth = true
-}
+`properties` is a table of container property values. If omitted, default property values will be assigned. It is convenient to store the properties table in a variable for reuse.
 
-list = EGUI.ListContainer(listProperties, {
-        EGUI.Container(itemProperties),
-        EGUI.Container(itemProperties),
-        EGUI.Container(itemProperties)
+`children` is a table containing other containers that will become direct children. This is useful for immediately creating nested container structures.
+
+```lua
+local parentProperties = { ... }
+local childProperties = { ... }
+
+local container = EGUI.Container(parentProperties, {
+        EGUI.Container(childProperties),
+        EGUI.Container(childProperties),
+        EGUI.Container(childProperties)
     })
 ```
 
-## RowContainer
-
-A `RowContainer` is identical to a `ListContainer`, except it aligns its children horizontally.
-
-# Properties
+## ListContainer
 
 ```lua
-x
-y
-width
-height
-fillWidth -- fills parent container dimension
-fillHeight
-alignH -- alignment within parent container
-alignV
-
-marginTop
-marginBottom
-marginLeft
-marginRight
-separation -- separation between children of a ListContainer
-expands -- ListContainer expands size as children are added
-
-backgroundVisible
-backgroundColor -- hex string
-borderVisible
-borderColor
-
-onMouseEnter -- callback in the form of function(self, event)
-onMouseHover
-onMouseClick
-onMouseWheel
-onMouseLeave
+local container = EGUI.ListContainer(properties, children)
 ```
+
+Functions like a `Container`. Children are arranged in a single column so that none overlap. When a child is removed, the gap is closed. There are some properties specific to `ListContainer`:
+
+* `separation` - spacing between adjacent elements of the list
+* `expands` - if set to true, the height of the list is purely determined by the list elements
+
+## RowContainer
+
+```lua
+local container = EGUI.RowContainer(properties, children)
+```
+
+A `RowContainer` is identical to a `ListContainer`, except it aligns its children horizontally.

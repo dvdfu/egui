@@ -348,7 +348,7 @@ local ScrollContainer = Class { __includes = Container }
 function ScrollContainer:init(props, children)
     props = props or {}
     props.onMouseWheel = function(self, event)
-        self.layout.scrollSpeed = event.wheelY * 12 -- TODO property
+        self.layout.scrollSpeed = self.layout.scrollSpeed + event.wheelY * 8 -- TODO property
     end
 
     local pane = ListContainer({
@@ -405,7 +405,7 @@ function ScrollContainer:update(dt)
     end
 end
 
---[[
+-- TODO make scrollbar its own GUI object
 function ScrollContainer:draw(region)
     Container.draw(self, region)
 
@@ -413,19 +413,15 @@ function ScrollContainer:draw(region)
     if self.pane.props.height <= self.props.height then return end
 
     love.graphics.push()
-        love.graphics.translate(self.layout.offsetX + self.props.x, self.layout.offsetY + self.props.y)
-        local y = -self.pane.props.y / self.pane.props.height * self.props.height
-        local h = self.props.height / self.pane.props.height * self.props.height
+    love.graphics.translate(self.layout.offsetX + self.props.x, self.layout.offsetY + self.props.y)
+    local y = -self.pane.props.y / self.pane.props.height * self.props.height
+    local h = self.props.height / self.pane.props.height * self.props.height
 
-        -- TODO make scrollbar its own GUI object
-        -- TODO property
-        love.graphics.rectangle('fill', self.props.width - 12, 0, 12, self.props.height)
-        love.graphics.setColor(200, 200, 200)
-        love.graphics.rectangle('fill', self.props.width - 12, y, 12, h)
-        love.graphics.setColor(255, 255, 255)
+    love.graphics.setColor(0, 0, 0, 64)
+    love.graphics.rectangle('fill', self.props.width - 12, y, 8, h)
+    love.graphics.setColor(255, 255, 255, 255)
     love.graphics.pop()
 end
-]]--
 
 --============================================================================== TEXT
 
