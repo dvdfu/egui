@@ -379,29 +379,50 @@ function ScrollContainer:update(dt)
     Container.update(self, dt)
     if math.abs(self.layout.scrollSpeed) > 0.1 then
         self.pane.props.y = self.pane.props.y + self.layout.scrollSpeed
-        self:containPane()
+
+        -- contain the pane
+        if self.pane.props.height < self.props.height then
+            self.pane.props.y = 0
+            self.layout.scrollSpeed = 0
+        else
+            if self.pane.props.y > 0 then
+                self.pane.props.y = 0
+                self.layout.scrollSpeed = 0
+            elseif self.pane.props.y + self.pane.props.height < self.props.height then
+                self.pane.props.y = self.props.height - self.pane.props.height
+                self.layout.scrollSpeed = 0
+            end
+        end
+
+        self.pane:refresh()
+
         self.layout.scrollSpeed = self.layout.scrollSpeed * 0.9 -- TODO property
     else
         self.layout.scrollSpeed = 0
     end
 end
 
-function ScrollContainer:containPane()
-    if self.pane.props.height < self.props.height then
-        self.pane.props.y = 0
-        self.layout.scrollSpeed = 0
-    else
-        if self.pane.props.y > 0 then
-            self.pane.props.y = 0
-            self.layout.scrollSpeed = 0
-        elseif self.pane.props.y + self.pane.props.height < self.props.height then
-            self.pane.props.y = self.props.height - self.pane.props.height
-            self.layout.scrollSpeed = 0
-        end
-    end
+--[[
+function ScrollContainer:draw(region)
+    Container.draw(self, region)
 
-    self.pane:refresh()
+    if not self.layout.visible then return end
+    if self.pane.props.height <= self.props.height then return end
+
+    love.graphics.push()
+        love.graphics.translate(self.layout.offsetX + self.props.x, self.layout.offsetY + self.props.y)
+        local y = -self.pane.props.y / self.pane.props.height * self.props.height
+        local h = self.props.height / self.pane.props.height * self.props.height
+
+        -- TODO make scrollbar its own GUI object
+        -- TODO property
+        love.graphics.rectangle('fill', self.props.width - 12, 0, 12, self.props.height)
+        love.graphics.setColor(200, 200, 200)
+        love.graphics.rectangle('fill', self.props.width - 12, y, 12, h)
+        love.graphics.setColor(255, 255, 255)
+    love.graphics.pop()
 end
+]]--
 
 --============================================================================== TEXT
 
