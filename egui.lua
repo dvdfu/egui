@@ -40,8 +40,8 @@ function Rectangle:getIntersection(other)
 end
 
 function Rectangle:contains(x, y)
-    return x >= self.pos.x and x <= self.pos.x + self.size.x and
-        y >= self.pos.y and y <= self.pos.y + self.size.y
+    return x >= self.pos.x and x < self.pos.x + self.size.x and
+        y >= self.pos.y and y < self.pos.y + self.size.y
 end
 
 function Rectangle:unpack()
@@ -79,10 +79,9 @@ local Container = Class {
         borderVisible = false,
         borderColor = '#888888',
         -- mouse events
-        onMouseEnter = nullFunction,
-        onMouseHover = nullFunction,
         onMouseClick = nullFunction,
         onMouseWheel = nullFunction,
+        onMouseEnter = nullFunction,
         onMouseLeave = nullFunction
     },
     defaultLayout = {
@@ -91,7 +90,8 @@ local Container = Class {
         alpha = 1,
         visible = true,
         scrollSpeed = 0
-    }
+    },
+    mouseTarget = nil
 }
 
 function Container:init(props, children)
@@ -178,34 +178,45 @@ end
 
 function Container:sendMouseEvent(event)
     if not self.layout.visible then return false end
-
-    event.x = event.x - self.props.x - self.props.marginLeft
-    event.y = event.y - self.props.y - self.props.marginTop
     local sent = false
 
     for _, child in pairs(self.children) do
-        if child:getBounds():contains(event.x, event.y) then
+        if event.type == 'moved' or child:getTrueBounds():contains(event.x, event.y) then
             if child:sendMouseEvent(event) then
                 sent = true
             end
         end
     end
 
-    if not sent then
-        if event.type == 'press' then
-            if self.props.onMouseClick ~= nullFunction then
-                self.props.onMouseClick(self, event)
-                sent = true
+    if sent then return true end
+
+    if event.type == 'press' then
+        if self.props.onMouseClick ~= nullFunction then
+            self.props.onMouseClick(self, event)
+            return true
+        end
+    elseif event.type == 'wheel' then
+        if self.props.onMouseWheel ~= nullFunction then
+            self.props.onMouseWheel(self, event)
+            return true
+        end
+    elseif event.type == 'moved' then
+        if self:getTrueBounds():contains(event.x, event.y) then
+            local target = Container.mouseTarget
+            if target ~= self then
+                if target and target.props.onMouseLeave ~= nullFunction then
+                    target.props.onMouseLeave(target, event)
+                end
+                if self.props.onMouseEnter ~= nullFunction then
+                    self.props.onMouseEnter(self, event)
+                end
             end
-        elseif event.type == 'wheel' then
-            if self.props.onMouseWheel ~= nullFunction then
-                self.props.onMouseWheel(self, event)
-                sent = true
-            end
+            Container.mouseTarget = self
+            return true
         end
     end
 
-    return sent
+    return false
 end
 
 function Container:tween(duration, layout, easing, after)
@@ -264,7 +275,7 @@ function Container:draw(region)
     -- draw background
     if self.props.backgroundVisible then
         love.graphics.setColor(hexToRGB(self.props.backgroundColor))
-        self:getBounds():draw('fill', self.layout.offsetX, self.layout.offsetY)
+        self:getBounds():draw('fill')
         love.graphics.setColor(255, 255, 255)
     end
 
@@ -289,7 +300,7 @@ function Container:draw(region)
     -- draw border
     if self.props.borderVisible then
         love.graphics.setColor(hexToRGB(self.props.borderColor))
-        self:getBounds():draw('line', self.layout.offsetX, self.layout.offsetY)
+        self:getBounds():draw('line')
         love.graphics.setColor(255, 255, 255)
     end
 
