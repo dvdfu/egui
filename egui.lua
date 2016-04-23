@@ -71,18 +71,27 @@ local Container = Class {
         marginBottom = 0,
         marginLeft = 0,
         marginRight = 0,
-        separation = 0,
-        expands = false,
         -- background and border
         backgroundVisible = false,
         backgroundColor = '#ffffff',
         borderVisible = false,
         borderColor = '#888888',
-        -- mouse events
+        -- callbacks
+        onDraw = nullFunction,
         onMouseClick = nullFunction,
         onMouseWheel = nullFunction,
         onMouseEnter = nullFunction,
-        onMouseLeave = nullFunction
+        onMouseLeave = nullFunction,
+        -- ListContainer
+        separation = 0,
+        expands = false,
+        -- ScrollContainer
+        showScrollbar = true,
+        scrollMultiplier = 8,
+        scrollDecay = 0.9,
+        -- Text
+        font = love.graphics.newFont(12),
+        fontColor = '#000000'
     },
     defaultLayout = {
         offsetX = 0,
@@ -266,9 +275,7 @@ end
 
 function Container:draw(region)
     if not self.layout.visible then return end
-
     region = region or self:getTrueBounds()
-
     love.graphics.push()
     love.graphics.translate(self.layout.offsetX, self.layout.offsetY)
 
@@ -279,11 +286,17 @@ function Container:draw(region)
         love.graphics.setColor(255, 255, 255)
     end
 
+    -- draw custom
+    love.graphics.push()
+    love.graphics.translate(self.props.x, self.props.y)
+    if self.props.onDraw ~= nullFunction then
+        self.props.onDraw()
+    end
+
     -- draw children
     if next(self.children) then
         love.graphics.push()
-        love.graphics.translate(self.props.x + self.props.marginLeft, self.props.y + self.props.marginTop)
-
+        love.graphics.translate(self.props.marginLeft, self.props.marginTop)
         local intersect = nil
         for _, child in pairs(self.children) do
             intersect = region:getIntersection(child:getTrueBounds())
@@ -292,10 +305,11 @@ function Container:draw(region)
                 child:draw(intersect)
             end
         end
-
         love.graphics.setScissor()
         love.graphics.pop()
     end
+
+    love.graphics.pop()
 
     -- draw border
     if self.props.borderVisible then
@@ -348,7 +362,7 @@ local ScrollContainer = Class { __includes = Container }
 function ScrollContainer:init(props, children)
     props = props or {}
     props.onMouseWheel = function(self, event)
-        self.layout.scrollSpeed = self.layout.scrollSpeed + event.wheelY * 8 -- TODO property
+        self.layout.scrollSpeed = self.layout.scrollSpeed + event.wheelY * self.props.scrollMultiplier
     end
 
     local pane = ListContainer({
@@ -399,7 +413,7 @@ function ScrollContainer:update(dt)
 
         self.pane:refresh()
 
-        self.layout.scrollSpeed = self.layout.scrollSpeed * 0.9 -- TODO property
+        self.layout.scrollSpeed = self.layout.scrollSpeed * self.props.scrollDecay
     else
         self.layout.scrollSpeed = 0
     end
@@ -410,6 +424,7 @@ function ScrollContainer:draw(region)
     Container.draw(self, region)
 
     if not self.layout.visible then return end
+    if not self.props.showScrollbar then return end
     if self.pane.props.height <= self.props.height then return end
 
     love.graphics.push()
@@ -432,9 +447,7 @@ local Text = Class {
         fillHeight = true,
         alignH = 'left',
         alignV = 'center'
-    },
-    defaultFont = love.graphics.newFont(12),
-    defaultFontColor = '#000000'
+    }
 }
 
 function Text:init(text, props)
@@ -445,8 +458,6 @@ function Text:init(text, props)
     Container.init(self, props)
 
     self.text = text
-    self.font = props.font or Text.defaultFont
-    self.fontColor = props.fontColor or Text.defaultFontColor
 end
 
 function Text:add(child) end
@@ -454,14 +465,14 @@ function Text:add(child) end
 function Text:remove(child) end
 
 function Text:draw()
-    love.graphics.setColor(hexToRGB(self.fontColor))
-    love.graphics.setFont(self.font)
+    love.graphics.setColor(hexToRGB(self.props.fontColor))
+    love.graphics.setFont(self.props.font)
 
     local y = 0
     if self.props.alignV == 'center' then
-        y = (self.props.height - self.font:getHeight()) / 2
+        y = (self.props.height - self.props.font:getHeight()) / 2
     elseif self.props.alignV == 'bottom' then
-        y = self.props.height - self.font:getHeight()
+        y = self.props.height - self.props.font:getHeight()
     end
     love.graphics.printf(self.text, 0, y, self.props.width, self.props.alignH)
     love.graphics.setColor(255, 255, 255)
