@@ -52,6 +52,7 @@ marginBottom
 marginLeft
 marginRight
 separation -- separation between children of a ListContainer
+expands -- ListContainer expands size as children are added
 
 backgroundVisible
 backgroundColor -- hex string
@@ -61,5 +62,6 @@ borderColor
 onMouseEnter -- callback in the form of function(self, event)
 onMouseHover
 onMouseClick
+onMouseWheel
 onMouseLeave
 ```

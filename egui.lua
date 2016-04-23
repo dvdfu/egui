@@ -37,9 +37,22 @@ function Rectangle:intersectsChild(child)
         child.pos.y <= self.size.y
 end
 
+function Rectangle:getIntersection(other)
+    local l = math.max(self.pos.x, other.pos.x)
+    local r = math.min(self.pos.x + self.size.x, other.pos.x + other.size.x)
+    local u = math.max(self.pos.y, other.pos.y)
+    local d = math.min(self.pos.y + self.size.y, other.pos.y + other.size.y)
+    if r - l < 0 or d - u < 0 then return nil end
+    return Rectangle(l, u, r - l, d - u)
+end
+
 function Rectangle:contains(x, y)
     return x >= self.pos.x and x <= self.pos.x + self.size.x and
         y >= self.pos.y and y <= self.pos.y + self.size.y
+end
+
+function Rectangle:unpack()
+    return self.pos.x, self.pos.y, self.size.x, self.size.y
 end
 
 function Rectangle:draw(mode)
@@ -64,6 +77,7 @@ local Container = Class {
         marginLeft = 0,
         marginRight = 0,
         separation = 0,
+        expands = false,
         -- background and border
         backgroundVisible = false,
         backgroundColor = '#ffffff',
@@ -73,13 +87,15 @@ local Container = Class {
         onMouseEnter = nullFunction,
         onMouseHover = nullFunction,
         onMouseClick = nullFunction,
+        onMouseWheel = nullFunction,
         onMouseLeave = nullFunction
     },
     defaultLayout = {
         offsetX = 0,
         offsetY = 0,
         alpha = 1,
-        visible = true
+        visible = true,
+        scrollSpeed = 0
     }
 }
 
@@ -87,6 +103,7 @@ function Container:init(props, children)
     self.props = {}
     self.temp = {}
     self.layout = {}
+    self.event = {}
     self.parent = nil
     self.children = {}
 
@@ -109,6 +126,8 @@ function Container:add(child)
     table.insert(self.children, child)
     child.parent = self
     child:refresh()
+
+    self:refresh()
 end
 
 function Container:remove(child)
@@ -174,9 +193,14 @@ function Container:sendMouseEvent(event)
     end
 
     if not sent then
-        if event.pressed then
+        if event.type == 'press' then
             if self.props.onMouseClick ~= nullFunction then
                 self.props.onMouseClick(self, event)
+                sent = true
+            end
+        elseif event.type == 'wheel' then
+            if self.props.onMouseWheel ~= nullFunction then
+                self.props.onMouseWheel(self, event)
                 sent = true
             end
         end
@@ -211,6 +235,13 @@ function Container:getInnerBounds()
     return self.temp.innerBounds
 end
 
+function Container:getTrueBounds()
+    if self.temp.trueBounds then return self.temp.trueBounds end
+    local x, y = self:getTruePosition():unpack()
+    self.temp.trueBounds = Rectangle(x, y, self.props.width, self.props.height)
+    return self.temp.trueBounds
+end
+
 -- calculates container position relative to the GUI root container
 function Container:getTruePosition()
     if self.temp.truePosition then return self.temp.truePosition end
@@ -223,63 +254,54 @@ function Container:getTruePosition()
     return self.temp.truePosition
 end
 
-function Container:draw()
+function Container:draw(region)
     if not self.layout.visible then return end
 
-    love.graphics.push()
-    love.graphics.translate(self.layout.offsetX, self.layout.offsetY)
-
-    if self.props.backgroundVisible then
-        love.graphics.setColor(hexToRGB(self.props.backgroundColor))
-        self:getBounds():draw('fill', self.layout.offsetX, self.layout.offsetY)
-        love.graphics.setColor(255, 255, 255)
+    if not region then
+        region = self:getTrueBounds()
     end
 
-    if #self.children > 0 then
-        love.graphics.push()
-        love.graphics.translate(
-            self.props.x + self.props.marginLeft,
-            self.props.y + self.props.marginTop)
-        local sx, sy = self:getTruePosition():unpack()
-        local sw, sh = self.props.width, self.props.height
-        love.graphics.setScissor(sx, sy, sw, sh)
+    love.graphics.push()
+        love.graphics.translate(self.layout.offsetX, self.layout.offsetY)
 
-        for _, child in pairs(self.children) do
-            if self:getBounds():intersectsChild(child:getBounds()) then
-                child:draw()
-            end
+        -- draw background
+        if self.props.backgroundVisible then
+            love.graphics.setColor(hexToRGB(self.props.backgroundColor))
+            self:getBounds():draw('fill', self.layout.offsetX, self.layout.offsetY)
+            love.graphics.setColor(255, 255, 255)
         end
 
-        love.graphics.setScissor()
-        love.graphics.pop()
-    end
+        -- draw children
+        if next(self.children) then
+            love.graphics.push()
+                love.graphics.translate(
+                    self.props.x + self.props.marginLeft,
+                    self.props.y + self.props.marginTop)
 
-    if self.props.borderVisible then
-        love.graphics.setColor(hexToRGB(self.props.borderColor))
-        self:getBounds():draw('line', self.layout.offsetX, self.layout.offsetY)
-        love.graphics.setColor(255, 255, 255)
-    end
+                for _, child in pairs(self.children) do
+                    local intersect = region:getIntersection(child:getTrueBounds())
+                    if intersect then
+                        love.graphics.setScissor(intersect:unpack())
+                        child:draw(intersect)
+                    end
+                end
 
+                love.graphics.setScissor()
+            love.graphics.pop()
+        end
+
+        -- draw border
+        if self.props.borderVisible then
+            love.graphics.setColor(hexToRGB(self.props.borderColor))
+            self:getBounds():draw('line', self.layout.offsetX, self.layout.offsetY)
+            love.graphics.setColor(255, 255, 255)
+        end
     love.graphics.pop()
 end
 
 --============================================================================== LIST CONTAINER
 
 local ListContainer = Class { __includes = Container }
-
-function ListContainer:init(props, children)
-    Container.init(self, props, children)
-end
-
-function ListContainer:add(child)
-    if not self.temp.tail then
-        self.temp.tail = 0
-    end
-
-    child.props.y = self.temp.tail
-    Container.add(self, child)
-    self.temp.tail = self.temp.tail + child.props.height + self.props.separation
-end
 
 function ListContainer:refresh()
     self.temp = {}
@@ -291,6 +313,94 @@ function ListContainer:refresh()
         child:refresh()
         self.temp.tail = self.temp.tail + child.props.height + self.props.separation
     end
+
+    if self.props.expands then
+        self.props.height = math.max(0, self.temp.tail - self.props.separation)
+    end
+end
+
+--============================================================================== ROW CONTAINER
+
+local RowContainer = Class { __includes = Container }
+
+function RowContainer:refresh()
+    self.temp = {}
+    self:refreshProps()
+
+    self.temp.tail = 0
+    for _, child in pairs(self.children) do
+        child.props.x = self.temp.tail
+        child:refresh()
+        self.temp.tail = self.temp.tail + child.props.width + self.props.separation
+    end
+
+    if self.props.expands then
+        self.props.width = math.max(0, self.temp.tail - self.props.separation)
+    end
+end
+
+--============================================================================== SCROLL CONTAINER
+
+local ScrollContainer = Class { __includes = Container }
+
+function ScrollContainer:init(props, children)
+    props = props or {}
+    props.onMouseWheel = function(self, event)
+        self.layout.scrollSpeed = event.wheelY * 12
+    end
+
+    local pane = ListContainer({
+        fillWidth = true,
+        separation = props.separation,
+        expands = true
+    }, children)
+
+    Container.init(self, props, { pane })
+end
+
+function ScrollContainer:add(child)
+    if next(self.children) then
+        self.pane:add(child)
+    else
+        Container.add(self, child)
+        self.pane = child
+    end
+end
+
+function ScrollContainer:remove(child)
+    self.pane:remove(child)
+end
+
+function ScrollContainer:removeIndex(index)
+    self.pane:removeIndex(index)
+end
+
+function ScrollContainer:update(dt)
+    Container.update(self, dt)
+    if math.abs(self.layout.scrollSpeed) > 0.1 then
+        self.pane.props.y = self.pane.props.y + self.layout.scrollSpeed
+        self:containPane()
+        self.layout.scrollSpeed = self.layout.scrollSpeed * 0.9 -- TODO property
+    else
+        self.layout.scrollSpeed = 0
+    end
+end
+
+function ScrollContainer:containPane()
+    if self.pane.props.height < self.props.height then
+        self.pane.props.y = 0
+        self.layout.scrollSpeed = 0
+    else
+        if self.pane.props.y > 0 then
+            self.pane.props.y = 0
+            self.layout.scrollSpeed = 0
+        elseif self.pane.props.y + self.pane.props.height < self.props.height then
+            self.pane.props.y = self.props.height - self.pane.props.height
+            self.layout.scrollSpeed = 0
+        end
+    end
+
+    self.pane:refresh()
 end
 
 --============================================================================== TEXT
@@ -330,5 +440,7 @@ end
 return {
     Container = Container,
     ListContainer = ListContainer,
+    RowContainer = RowContainer,
+    ScrollContainer = ScrollContainer,
     Text = Text
 }
