@@ -79,7 +79,7 @@ local Container = Class {
         borderColor = '#888888',
         -- callbacks
         onDraw = nullFunction,
-        onMouseClick = nullFunction,
+        onMousePress = nullFunction,
         onMouseRelease = nullFunction,
         onMouseWheel = nullFunction,
         onMouseEnter = nullFunction,
@@ -190,30 +190,29 @@ end
 
 function Container:sendMouseEvent(event)
     if not self.layout.visible then return false end
+    if not self:getTrueBounds():contains(event.x, event.y) then return false end
     local sent = false
 
     for _, child in pairs(self.children) do
-        if event.type == 'moved' or child:getTrueBounds():contains(event.x, event.y) then
-            if child:sendMouseEvent(event) then
-                sent = true
-            end
+        if child:sendMouseEvent(event) then
+            sent = true
         end
     end
 
     if sent then return true end
 
     if event.type == 'press' then
-        Container.clickTarget = self
-        if self.props.onMouseClick ~= nullFunction then
-            self.props.onMouseClick(self, event)
+        if self.props.onMousePress ~= nullFunction or self.props.onMouseRelease ~= nullFunction then
+            Container.clickTarget = self
+            self.props.onMousePress(self, event)
+            return true
         end
-        return true
     elseif event.type == 'release' then
         if Container.clickTarget == self and self.props.onMouseRelease ~= nullFunction then
-            self.props.onMouseRelease(self, event)
             Container.clickTarget = nil
+            self.props.onMouseRelease(self, event)
+            return true
         end
-        return true
     elseif event.type == 'wheel' then
         if self.props.onMouseWheel ~= nullFunction then
             self.props.onMouseWheel(self, event)
@@ -474,15 +473,22 @@ function Text:add(child) end
 
 function Text:remove(child) end
 
+function Text:getTextHeight()
+    if self.temp.textHeight then return self.temp.textHeight end
+    local width, lines = self.props.font:getWrap(self.text, self.props.width)
+    self.temp.textHeight = self.props.font:getHeight() * (#lines)
+    return self.temp.textHeight
+end
+
 function Text:draw()
     love.graphics.setColor(hexToRGB(self.props.fontColor))
     love.graphics.setFont(self.props.font)
 
     local y = 0
     if self.props.alignV == 'center' then
-        y = (self.props.height - self.props.font:getHeight()) / 2
+        y = (self.props.height - self:getTextHeight()) / 2
     elseif self.props.alignV == 'bottom' then
-        y = self.props.height - self.props.font:getHeight()
+        y = self.props.height - self:getTextHeight()
     end
     love.graphics.printf(self.text, 0, y, self.props.width, self.props.alignH)
     love.graphics.setColor(255, 255, 255)
