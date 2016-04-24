@@ -1,6 +1,7 @@
-local Class = require('hump/class')
-local Vector = require('hump/vector')
-local Timer = require('hump/timer')
+local PATH = (...):gsub('egui$', '')
+local Class = require(PATH..'hump.class')
+local Vector = require(PATH..'hump.vector')
+local Timer = require(PATH..'hump.timer')
 
 --============================================================================== HELPERS
 
@@ -285,7 +286,7 @@ end
 function Container:draw(region)
     if not self.layout.visible then return end
     region = region or self:getTrueBounds()
-    love.graphics.push()
+    love.graphics.push('transform')
     love.graphics.translate(self.layout.offsetX, self.layout.offsetY)
 
     -- draw background
@@ -296,7 +297,7 @@ function Container:draw(region)
     end
 
     -- draw custom
-    love.graphics.push()
+    love.graphics.push('transform')
     love.graphics.translate(self.props.x, self.props.y)
     if self.props.onDraw ~= nullFunction then
         self.props.onDraw()
@@ -304,7 +305,7 @@ function Container:draw(region)
 
     -- draw children
     if next(self.children) then
-        love.graphics.push()
+        love.graphics.push('transform')
         love.graphics.translate(self.props.marginLeft, self.props.marginTop)
         local intersect = nil
         for _, child in pairs(self.children) do
@@ -436,7 +437,7 @@ function ScrollContainer:draw(region)
     if not self.props.showScrollbar then return end
     if self.pane.props.height <= self.props.height then return end
 
-    love.graphics.push()
+    love.graphics.push('transform')
     love.graphics.translate(self.layout.offsetX + self.props.x, self.layout.offsetY + self.props.y)
     local y = -self.pane.props.y / self.pane.props.height * self.props.height
     local h = self.props.height / self.pane.props.height * self.props.height
