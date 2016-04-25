@@ -78,6 +78,7 @@ local Container = Class {
         borderVisible = false,
         borderColor = '#888888',
         -- callbacks
+        onCreate = nullFunction,
         onDraw = nullFunction,
         onMousePress = nullFunction,
         onMouseRelease = nullFunction,
@@ -127,6 +128,10 @@ function Container:init(props, children)
     for _, child in pairs(children) do
         self:add(child)
     end
+
+    if self.props.onCreate ~= nullFunction then
+        self.props.onCreate(self)
+    end
 end
 
 function Container:add(child)
@@ -140,7 +145,7 @@ end
 function Container:remove(child)
     for k, v in pairs(self.children) do
         if v == child then
-            table.remove(self.children, k)
+            self.children[k] = nil
         end
     end
 
@@ -149,6 +154,14 @@ end
 
 function Container:removeIndex(index)
     self:remove(self.children[index])
+end
+
+function Container:removeAll()
+    for k, v in pairs(self.children) do
+        self.children[k] = nil
+    end
+
+    self:refresh()
 end
 
 -- update animation timers
@@ -490,7 +503,7 @@ function Text:draw()
     elseif self.props.alignV == 'bottom' then
         y = self.props.height - self:getTextHeight()
     end
-    love.graphics.printf(self.text, 0, y, self.props.width, self.props.alignH)
+    love.graphics.printf(self.text, self.props.x, y, self.props.width, self.props.alignH)
     love.graphics.setColor(255, 255, 255)
 end
 
